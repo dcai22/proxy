@@ -4,7 +4,7 @@ from cache import *
 from httpHelper import *
 from util import *
 
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 import threading
 import socket
@@ -28,7 +28,7 @@ def handleClient(clientSocket, addr):
         ### 2. Client Request
         try:
             clientRequest = clientSocket.recv(BUFFER_LEN)
-            date = datetime.now().strftime('%d/%b/%Y:%H:%M:%S %z')
+            date = datetime.now(timezone.utc).astimezone().strftime('%d/%b/%Y:%H:%M:%S %z')
         except Exception:
             break
         if clientRequest == b'':
