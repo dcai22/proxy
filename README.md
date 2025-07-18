@@ -5,7 +5,7 @@ Acts as an intermediary between clients and origin servers, forwarding HTTP requ
 ## Features
 - Supports standard HTTP methods: **GET, HEAD, POST**
 - Supports HTTPS tunnelling via **CONNECT**
-- **Persistent connections**: handles multiple requests over a single connection
+- **Persistent connections**: handles multiple requests over a single client connection
 - **Concurrency**: spawns threads to handle multiple client connections concurrently
 - **Caching**: thread-safe **LRU cache** stores successful GET responses
   - URL normalisation avoids duplicate entries
@@ -20,7 +20,7 @@ Acts as an intermediary between clients and origin servers, forwarding HTTP requ
 - Adds/updates standard proxy headers
   - `Connection`
   - `Via`
-- Logs each HTTP transaction with a Common Log Format variant
+- Logs each HTTP transaction in a variant of the Common Log Format
 - Graceful socket closure and configurable connection timeouts
 
 ## Code Structure
@@ -45,9 +45,17 @@ python3 proxy.py <port> <timeout> <maxObjectSize> <maxCacheSize>
 python3 proxy.py 12000 60 10000 100000
 ```
 - `port`: Port for the proxy to listen on
-- `timeout`: Timeout (seconds) before closing idle client/server connections
+- `timeout`: Timeout in seconds before closing idle client/server connections
 - `maxObjectSize`: Maximum size (bytes) of a single cached response
 - `maxCacheSize`: Maximum total size (bytes) of all cached responses
+
+The simplest way to test the proxy is with Firefox:
+1. Open Firefox and navigate to `Settings > Network Settings > Settings`
+2. Enable `Manual proxy configuration`
+3. Enter `localhost` (or `127.0.0.1`) and your chosen port under `HTTP Proxy`
+4. Check `Also use this proxy for HTTPS` to proxy HTTPS traffic via `CONNECT`
+
+> **Note:** This proxy is intended for learning and testing purposes. Do not submit sensitive data through it.
 
 ## Logging
 Each HTTP transaction is logged in the following format:
