@@ -1,4 +1,4 @@
-def makeErrorResponse(status, reason, connectionHeader, body):
+def makeErrorResponse(status: int, reason: str, connectionHeader: str, body: str) -> tuple[bytes, int, int]:
     contentLength = len(body)
     response = (
         f'HTTP/1.1 {status} {reason}\r\n'
@@ -10,23 +10,23 @@ def makeErrorResponse(status, reason, connectionHeader, body):
     )
     return response.encode(), status, contentLength
 
-def invalidPortErrorResponse(connectionHeader):
+def invalidPortErrorResponse(connectionHeader: str) -> tuple[bytes, int, int]:
     return makeErrorResponse(400, 'Bad Request', connectionHeader, 'invalid port')
 
-def noHostErrorResponse(connectionHeader):
+def noHostErrorResponse(connectionHeader: str) -> tuple[bytes, int, int]:
     return makeErrorResponse(400, 'Bad Request', connectionHeader, 'no host')
 
-def misdirectedRequestErrorResponse(connectionHeader):
+def misdirectedRequestErrorResponse(connectionHeader: str) -> tuple[bytes, int, int]:
     return makeErrorResponse(421, 'Misdirected Request', connectionHeader, 'proxy address')
 
-def connectionRefusedErrorResponse(connectionHeader):
+def connectionRefusedErrorResponse(connectionHeader: str) -> tuple[bytes, int, int]:
     return makeErrorResponse(502, 'Bad Gateway', connectionHeader, 'connection refused')
 
-def couldNotResolveErrorResponse(connectionHeader):
+def couldNotResolveErrorResponse(connectionHeader: str) -> tuple[bytes, int, int]:
     return makeErrorResponse(502, 'Bad Gateway', connectionHeader, 'could not resolve')
 
-def closedUnexpectedlyErrorResponse(connectionHeader):
+def closedUnexpectedlyErrorResponse(connectionHeader: str) -> tuple[bytes, int, int]:
     return makeErrorResponse(502, 'Bad Gateway', connectionHeader, 'closed unexpectedly')
 
-def timeoutErrorResponse(connectionHeader):
+def timeoutErrorResponse(connectionHeader: str) -> tuple[bytes, int, int]:
     return makeErrorResponse(504, 'Gateway Timeout', connectionHeader, 'timed out')

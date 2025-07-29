@@ -1,5 +1,7 @@
+from enums import MessageType
+
 # message must be a string literal
-def parseHttpMessage(message):
+def parseHttpMessage(message: str) -> tuple[str, dict[str, list[str]], bytes]:
     sections = message.split(b'\r\n\r\n', 1)
     body = sections[1]
     header = sections[0].decode('utf-8')
@@ -19,7 +21,7 @@ def parseHttpMessage(message):
 
     return startLine, headers, body
 
-def buildHttpMessage(startLine, headers, body = b''):
+def buildHttpMessage(startLine: str, headers: dict[str, list[str]], body: bytes = b'') -> bytes:
     header = startLine + '\r\n'
     for headerName in headers:
         if not headers.get(headerName):
@@ -33,27 +35,26 @@ def buildHttpMessage(startLine, headers, body = b''):
     message = header.encode() + b'\r\n' + body
     return message
 
-def getStatusAndBytes(response):
+def getStatusAndBytes(response: bytes) -> tuple[str, int]:
     header, body = response.split(b'\r\n\r\n', 1)
-    bytes = len(body)
+    numBytes = len(body)
     header = header.decode('utf-8')
     startLine = header.split('\r\n')[0]
     status = startLine.split(' ')[1]
-    return status, bytes
+    return status, numBytes
 
-# messageType is 'request' or 'response'
-def getContentLength(headers, messageType):
+def getContentLength(headers: dict[str, list[str]], messageType: MessageType) -> int:
     if headers.get('transfer-encoding') is not None:
         # -1 indicates reading until connection is closed
         return -1
     elif headers.get('content-length') is not None:
         return int(headers['content-length'][0])
-    elif messageType == 'request':
+    elif messageType == MessageType.REQUEST:
         return 0
     else:
         return -1
 
-def parseUrl(url):
+def parseUrl(url: str) -> tuple[str, str, str, str, str]:
     if '://' in url:
         scheme, url = url.split('://', 1)
     else:

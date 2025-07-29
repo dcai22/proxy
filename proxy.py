@@ -3,6 +3,7 @@ from errorResponse import *
 from cache import *
 from httpHelper import *
 from util import *
+from enums import *
 
 from datetime import datetime, timezone
 import sys
@@ -21,9 +22,9 @@ TIMEOUT = int(sys.argv[2])
 MAX_OBJECT_SIZE = int(sys.argv[3])
 MAX_CACHE_SIZE = int(sys.argv[4])
 
-def handleClient(clientSocket, addr):
+def handleClient(clientSocket: socket.socket, addr: tuple[str, int]) -> None:
     while True:
-        cacheStatus = '-'
+        cacheStatus = CacheStatus.NONE
 
         ### 2. Client Request
         try:
@@ -39,7 +40,7 @@ def handleClient(clientSocket, addr):
         method, target, reqProtocol = reqStartLine.split(' ')
 
         # Read body
-        reqContentLength = getContentLength(reqHeaders, 'request')
+        reqContentLength = getContentLength(reqHeaders, MessageType.REQUEST)
         connectionClosed, _, reqBody = readBody(reqBody, clientSocket, reqContentLength)
         if connectionClosed:
             break
@@ -57,18 +58,18 @@ def handleClient(clientSocket, addr):
             _, hostname, port, path, query = parseUrl(target)
             if hostname == '':
                 try:
-                    response, status, bytes = noHostErrorResponse(connectionHeader)
+                    response, status, numBytes = noHostErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
                 else: break
             if hostname in ['127.0.0.1', 'localhost'] and int(port) == PROXY_PORT:
                 try:
-                    response, status, bytes = misdirectedRequestErrorResponse(connectionHeader)
+                    response, status, numBytes = misdirectedRequestErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -78,18 +79,18 @@ def handleClient(clientSocket, addr):
             if method == 'GET':
                 cachedResponse = cache.lookup(normalise(target))
                 if cachedResponse is not None:
-                    cacheStatus = 'H'
+                    cacheStatus = CacheStatus.HIT
                     try:
-                        status, bytes = getStatusAndBytes(cachedResponse)
+                        status, numBytes = getStatusAndBytes(cachedResponse)
                         clientSocket.sendall(cachedResponse)
-                        log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                        log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                     except Exception:
                         break
                 else:
-                    cacheStatus = 'M'
+                    cacheStatus = CacheStatus.MISS
 
             transformedRequest = transformRequest(method, path, query, reqHeaders, reqProtocol, reqBody)
-        
+
             ### 3. Proxy-Server Connection
             serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -97,9 +98,9 @@ def handleClient(clientSocket, addr):
             except ConnectionRefusedError:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = connectionRefusedErrorResponse(connectionHeader)
+                    response, status, numBytes = connectionRefusedErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -107,9 +108,9 @@ def handleClient(clientSocket, addr):
             except socket.gaierror:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = couldNotResolveErrorResponse(connectionHeader)
+                    response, status, numBytes = couldNotResolveErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -126,9 +127,9 @@ def handleClient(clientSocket, addr):
             except Exception:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = closedUnexpectedlyErrorResponse(connectionHeader)
+                    response, status, numBytes = closedUnexpectedlyErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -140,9 +141,9 @@ def handleClient(clientSocket, addr):
             except socket.timeout:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = timeoutErrorResponse(connectionHeader)
+                    response, status, numBytes = timeoutErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -150,9 +151,9 @@ def handleClient(clientSocket, addr):
             except Exception:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = closedUnexpectedlyErrorResponse(connectionHeader)
+                    response, status, numBytes = closedUnexpectedlyErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -160,9 +161,9 @@ def handleClient(clientSocket, addr):
             if serverResponse == b'':
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = closedUnexpectedlyErrorResponse(connectionHeader)
+                    response, status, numBytes = closedUnexpectedlyErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -176,16 +177,16 @@ def handleClient(clientSocket, addr):
 
             # Read body
             if resBodyIsExpected(method, status):
-                resContentLength = getContentLength(resHeaders, 'response')
+                resContentLength = getContentLength(resHeaders, MessageType.RESPONSE)
             else:
                 resContentLength = 0
             connectionClosed, timedOut, resBody = readBody(resBody, serverSocket, resContentLength)
             if connectionClosed or timedOut:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = closedUnexpectedlyErrorResponse(connectionHeader) if connectionClosed else timeoutErrorResponse(connectionHeader)
+                    response, status, numBytes = closedUnexpectedlyErrorResponse(connectionHeader) if connectionClosed else timeoutErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -224,18 +225,18 @@ def handleClient(clientSocket, addr):
             hostname, _, port = target.partition(':')
             if port != '443':
                 try:
-                    response, status, bytes = invalidPortErrorResponse(connectionHeader)
+                    response, status, numBytes = invalidPortErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
                 else: break
             if hostname == '':
                 try:
-                    response, status, bytes = noHostErrorResponse(connectionHeader)
+                    response, status, numBytes = noHostErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -248,9 +249,9 @@ def handleClient(clientSocket, addr):
             except ConnectionRefusedError:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = connectionRefusedErrorResponse(connectionHeader)
+                    response, status, numBytes = connectionRefusedErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -258,9 +259,9 @@ def handleClient(clientSocket, addr):
             except socket.gaierror:
                 safeClose(serverSocket)
                 try:
-                    response, status, bytes = couldNotResolveErrorResponse(connectionHeader)
+                    response, status, numBytes = couldNotResolveErrorResponse(connectionHeader)
                     clientSocket.sendall(response)
-                    log(addr, cacheStatus, date, reqStartLine, status, bytes)
+                    log(addr, cacheStatus, date, reqStartLine, status, numBytes)
                 except Exception:
                     break
                 if persistent: continue
@@ -293,7 +294,7 @@ def handleClient(clientSocket, addr):
             break
     safeClose(clientSocket)
 
-def readBody(body, socket, contentLength):
+def readBody(body: bytes, socket: socket.socket, contentLength: int) -> tuple[bool, bool, bytes]:
     connectionClosed = False
     timedOut = False
     try:
@@ -314,7 +315,7 @@ def readBody(body, socket, contentLength):
         connectionClosed = True
     return connectionClosed, timedOut, body
 
-def transformRequest(method, path, query, headers, protocol, body):
+def transformRequest(method: str, path: str, query: str, headers: dict[str, list[str]], protocol: str, body: bytes) -> bytes:
     headers['connection'] = ['close']
 
     # Insert or Append 'Via'
@@ -333,7 +334,7 @@ def transformRequest(method, path, query, headers, protocol, body):
 
     return request
 
-def blindForward(fromSocket, toSocket):
+def blindForward(fromSocket: socket.socket, toSocket: socket.socket) -> None:
     try:
         while True:
             data = fromSocket.recv(BUFFER_LEN)
